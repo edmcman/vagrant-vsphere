@@ -28,50 +28,27 @@ describe VagrantPlugins::VSphere::Action::GetSshInfo do
     expect(@env[:machine_ssh_info][:host]).to be IP_ADDRESS
   end
 
-  context 'when acting on a VM with a single network adapter' do
-    before do
-      allow(@vm.guest).to receive(:ipAddress) { '127.0.0.2' }
-      @env[:machine].stub(:id).and_return(EXISTING_UUID)
-    end
-
-    it 'should return the correct ip address' do
-      call
-      expect(@env[:machine_ssh_info][:host]).to eq '127.0.0.2'
-    end
-  end
-
   context 'when acting on a VM with multiple network adapters' do
     before do
-      @env[:machine].stub(:id).and_return(EXISTING_UUID)
+      allow(@vm.guest).to receive(:ipAddress) { '127.0.0.2' }
       allow(@vm.guest).to receive(:net) {
-        [double('GuestNicInfo',
-                ipAddress: ['bad address', '127.0.0.1'],
-                deviceConfigId: 4000,
-                ipConfig: double('NetIpConfigInfo',
-                                 ipAddress: [double('NetIpConfigInfoIpAddress',
-                                                    ipAddress: 'bad address', state: 'unknown'),
-                                             double('NetIpConfigInfoIpAddress',
-                                                    ipAddress: '127.0.0.1', state: 'preferred')]
-                                )
-               ),
-         double('GuestNicInfo',
-                ipAddress: ['bad address', '255.255.255.255'],
-                deviceConfigId: -1,
-                ipConfig: double('NetIpConfigInfo',
-                                 ipAddress: [double('NetIpConfigInfoIpAddress',
-                                                    ipAddress: 'bad address', state: 'unknown'),
-                                             double('NetIpConfigInfoIpAddress',
-                                                    ipAddress: '255.255.255.255', state: 'preferred')]
-                                )
-               )
+        [
+          double('guest_nic_info',
+                 ipAddress: ['127.0.0.2', 'mac address'],
+                 deviceConfigId: -1
+                ),
+          double('guest_nic_info',
+                 ipAddress: ['127.0.0.1', 'mac address'],
+                 deviceConfigId: 4000
+                )
         ]
       }
+      @env[:machine].stub(:id).and_return(EXISTING_UUID)
     end
-
     context 'when the real_nic_ip option is false' do
       it 'sets the ssh info the original adapter' do
         call
-        expect(@env[:machine_ssh_info][:host]).to eq IP_ADDRESS
+        expect(@env[:machine_ssh_info][:host]).to eq '127.0.0.2'
       end
     end
 
@@ -82,29 +59,17 @@ describe VagrantPlugins::VSphere::Action::GetSshInfo do
       context 'when there are mutiple valid adapters' do
         before do
           allow(@vm.guest).to receive(:net) {
-            [double('GuestNicInfo',
-                    ipAddress: ['bad address', '127.0.0.1'],
-                    deviceConfigId: 4000,
-                    ipConfig: double('NetIpConfigInfo',
-                                     ipAddress: [double('NetIpConfigInfoIpAddress',
-                                                        ipAddress: 'bad address', state: 'unknown'),
-                                                 double('NetIpConfigInfoIpAddress',
-                                                        ipAddress: '127.0.0.2', state: 'preferred')]
-                                    )
-                   ),
-             double('GuestNicInfo',
-                    ipAddress: ['bad address', '255.255.255.255'],
-                    deviceConfigId: 2000,
-                    ipConfig: double('NetIpConfigInfo',
-                                     ipAddress: [double('NetIpConfigInfoIpAddress',
-                                                        ipAddress: 'bad address', state: 'unknown'),
-                                                 double('NetIpConfigInfoIpAddress',
-                                                        ipAddress: '255.255.255.255', state: 'preferred')]
-                                    )
-                   )
+            [
+              double('guest_nic_info',
+                     ipAddress: ['127.0.0.2', 'mac address'],
+                     deviceConfigId: 4001
+                    ),
+              double('guest_nic_info',
+                     ipAddress: ['127.0.0.1', 'mac address'],
+                     deviceConfigId: 4000
+                    )
             ]
           }
-
         end
         it 'should raise an error' do
           expect { call }.to raise_error(VagrantPlugins::VSphere::Errors::VSphereError)
